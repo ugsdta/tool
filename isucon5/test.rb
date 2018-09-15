@@ -7,7 +7,7 @@ require 'redis/namespace'
 require 'redis-objects'
 require 'json'
 
-client = Mysql2::Client.new(
+db = Mysql2::Client.new(
   host: '127.0.0.1',
   port: '3306',
   username: 'isucon',
@@ -15,134 +15,117 @@ client = Mysql2::Client.new(
   database: 'isucon5q',
   reconnect: true,
 )
-client.query_options.merge!(symbolize_keys: true)
+db.query_options.merge!(symbolize_keys: true)
 
 redis_connection = Redis.new(:path => "/var/run/redis/redis.sock")
-redis_users = Redis::Namespace.new(:users, :redis => redis_connection)
+redis_ts = Redis::Namespace.new(:testspace, :redis => redis_connection)
 
-Redis.current = redis_users
+Redis.current = redis_ts
 
-query = 'SELECT * FROM users'
-count = 1
-client.query(query).each do |user|
-  puts "count = #{count} user_id = #{user[:id]}"
-  redis_user = Redis::HashKey.new(user[:id])
-  redis_user.bulk_set('account_name' => user[:account_name], 'nick_name' => user[:nick_name], 'email' => user[:email], 'passhash' => user[:passhash])
-  count += 1
+# query = 'SELECT * FROM users'
+# count = 1
+# client.query(query).each do |user|
+#   puts "count = #{count} user_id = #{user[:id]}"
+#   redis_user = Redis::HashKey.new(user[:id])
+#   redis_user.bulk_set('account_name' => user[:account_name], 'nick_name' => user[:nick_name], 'email' => user[:email], 'passhash' => user[:passhash])
+#   count += 1
+# end
+
+# redis_ss = Redis::SortedSet.new("testkey")
+# redis_ss[1] = 10
+# redis_ss[2] = 20
+# redis_ss[3] = 30
+# pp redis_ss.members
+# #pp redis_ss["testmember4"]
+# #pp redis_ss.score("testmember4")
+# #pp redis_ss.rank("testmember4")
+# hash = {}
+# for mem in redis_ss.members
+#   hash[mem] = 1
+# end
+# pp hash
+# pp hash["1"]
+
+#query = 'insert into comments (entry_id, user_id, comment) values (?, ?, ?)'
+#res = client.xquery(query, 1, 1, 'testcomment')
+#pp client.last_id
+
+#array = ["3", "1", "2"]
+# array = [3, 1, 2]
+# query = 'select * from comments where id in (?) order by field (id, ?)'
+# db.xquery(query, array, array).each do |c|
+#   pp c[:id]
+# end
+# 
+# pp 1 == "1"
+
+# redis_ss = Redis::SortedSet.new("1")
+# redis_ss[1] = 10
+# redis_ss[2] = 20
+# redis_ss = Redis::SortedSet.new(1)
+# redis_ss[1] = nil
+# pp redis_ss.members(:with_scores => true)
+#pp redis_ss.score("1")
+
+# comments_query = <<SQL
+# SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000
+# SQL
+#   cnt = 0
+#   db.query(comments_query).each do |c|
+#     #next unless is_friend?(redis_relations, user[:id], c[:user_id])
+#     #entry = db.xquery('SELECT * FROM entries WHERE id = ?', c[:entry_id]).first
+#     #entry[:is_private] = (entry[:private] == 1)
+#     #next if entry[:is_private] && !permitted?(redis_relations, user[:id], entry[:user_id])
+#     id = c[:id]
+#     created_at = c[:created_at]
+#     pp id
+#     pp created_at.to_i
+#     redis_fc_ss = Redis::SortedSet.new(111)
+#     redis_fc_ss[id] = created_at.to_i
+#     cnt += 1
+#     break if cnt >= 10 
+#   end
+
+#       user_comments_query = <<SQL
+# select id, entry_id, created_at
+# from comments
+# where user_id = ?
+# order by created_at desc
+# limit 50
+# SQL
+#       entries_query = <<SQL
+# select id, user_id, private
+# from entries
+# where id in (?)
+# SQL
+#       comments = db.xquery(user_comments_query, 3657)
+#       entry_ids = comments.map{|c| c[:entry_id]}
+#       #pp entry_ids
+#       entries = {}
+#       db.xquery(entries_query, entry_ids).each do |e|
+#         entries[e[:id]] = e  
+#       end
+#       pp entries
+#       # cnt = 0
+#       # comments.each do |comment|
+#       #   entry_id = comment[:entry_id]
+#       #   entry_user_id = entries[entry_id.to_s][:user_id]
+
+entries_query = <<SQL
+select id from entries
+SQL
+puts "entry_comments_count"
+db.query(entries_query).each do |entry|
+  puts "entry_id:#{entry[:id]}"
+  db.xquery('SELECT COUNT(id) as c FROM comments WHERE entry_id = ?', entry[:id]).each do |c|
+    redis_ec_count = Redis::Counter.new(entry[:id])
+    redis_ec_count.value = c[:c]
+  end
 end
 
-#redis_connection = Redis.new(:path => "/var/run/redis/redis.sock")
-#redis_entries = Redis::Namespace.new(:entries, :redis => redis_connection)
-#
-#Redis.current = redis_entries
-#latest_1000_entries = Redis::List.new('latest_1000_entries', :maxlength => 1000, :marshal => true)
-#latest_1000_entries.clear
-#
-#query = 'SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000'
-##query = 'SELECT * FROM entries ORDER BY created_at DESC LIMIT 3'
-#count = 1
-#client.query(query).each do |entry|
-#  #pp entry[:user_id]
-#  puts "count = #{count} user_id = #{entry[:user_id]}"
-#  latest_1000_entries << {:id => entry[:id], :user_id => entry[:user_id], :private => entry[:private], :body => entry[:body], :created_at => entry[:created_at]}
-#  count += 1
-#end
 
 
-#t = Time.now
-#t_sp = t.to_s.split(' ')
-#date = t_sp[0]
-#pp t.to_s
-#t_sp = t.to_s.split(' ')
-#pp date = t_sp[0]
-#pp time = t_sp[1]
 
 
-#query = 'SELECT * FROM relations WHERE one = ?'
-#relation = client.xquery(query, '3333').first
-#pp relation
 
-#query = 'SELECT id,user_id FROM entries limit 200000 offset 390000'
-#count = 390000
-#client.xquery(query).each do |entry|
-#  #pp entry
-#  #break;
-#  query = 'UPDATE comments SET entry_user_id = ? WHERE entry_id = ?'
-#  client.xquery(query, entry[:user_id], entry[:id])
-#  count += 1
-#  puts count
-#end
-
-
-#redis = Redis.new(:host => "127.0.0.1", :port => 6379)
-#redis = Redis.new(:path => "/var/run/redis/redis.sock")
-
-#redis_connection = Redis.new(:path => "/var/run/redis/redis.sock")
-#redis = Redis::Namespace.new(:footprints, :redis => redis_connection)
-#redis_footprints = Redis::Namespace.new(:footprints, :redis => redis_connection)
-#redis_footprints_updated = Redis::Namespace.new(:footprints_updated, :redis => redis_connection)
-#redis_footprints2 = Redis::Namespace.new(:footprints2, :redis => redis_connection)
-
-#redis.set "foo", "bar"
-
-#Redis.current = redis_footprints
-#counter = Redis::Counter.new('counter_name')
-#counter.increment  # or incr
-#counter.decrement  # or decr
-#counter.increment(3)
-#puts counter.value
-
-#Redis.current = redis_footprints2
-#counter = Redis::Counter.new('counter_name')
-#counter.increment  # or incr
-#counter.decrement  # or decr
-#counter.increment(3)
-#puts counter.value
-
-#Redis.current = redis_footprints
-#fp_list = Redis::List.new(1, :maxlength => 50)
-#fp_list << '2_20170930'
-#fp_list << '3_20170930'
-#fp_list << '4_20170930'
-#fp_list.unshift('test')
-#puts fp_list.values
-
-#query = <<SQL
-#SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
-#FROM footprints
-#WHERE user_id = ?
-#GROUP BY user_id, owner_id, DATE(created_at)
-#ORDER BY updated DESC
-#LIMIT 50
-#SQL
-
-
-#test = 'test-a'
-#test = test.gsub(/-/, '_')
-#puts test
-#exit
-
-#for i in 1..5000
-#for i in 3657..3657
-#for i in 1..1
-#  #footprints = client.xquery(query, i).first
-#  #pp footprints
-#  Redis.current = redis_footprints
-#  fp_list = Redis::List.new(i, :maxlength => 50)
-#  pp fp_list.values
-#  exit
-#  puts i
-#  #Redis.current = redis_footprints_updated
-#  fp_updated = Redis::HashKey.new("#{i}_updated")
-#  client.xquery(query, i).each do |fp|
-#    date = fp[:date].to_s
-#    #pp date
-#    #date = date.gsub(/-/, '_')
-#    fp_list << "#{fp[:owner_id]}_#{date}"
-#    #fp_updated = Redis::Value.new("#{fp[:user_id]}_#{fp[:owner_id]}_#{date}")
-#    #fp_updated.value = fp[:updated].to_s
-#    fp_updated["#{fp[:owner_id]}_#{date}"] = fp[:updated].to_s
-#  end
-#  #puts fp_list.values
-#end
 
